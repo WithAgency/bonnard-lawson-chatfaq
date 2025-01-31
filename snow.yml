@@ -35,7 +35,7 @@ ingresses:
 hooks:
   - when: 'pre-deploy'
     component: migrate
-    run_command: modelw-docker run bash -c "python manage.py migrate && python make apply_fixtures"
+    run_command: modelw-docker run bash -c "python manage.py migrate && make apply_fixtures"
 
 domains:
   - id: back
