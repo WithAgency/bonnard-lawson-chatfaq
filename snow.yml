@@ -15,6 +15,10 @@ components:
     image: back
     envs: [back]
     size_hint: ram >= 512m
+  - id: migrate
+    image: back
+    envs: [back]
+    size_hint: ram >= 2g
 
 ingresses:
   - match:
@@ -30,8 +34,8 @@ ingresses:
 
 hooks:
   - when: 'pre-deploy'
-    component: chatfaq-migrate
-    run_command: modelw-docker run python manage.py migrate
+    component: migrate
+    run_command: modelw-docker run python manage.py migrate && modelw-docker run python make apply_fixtures
 
 domains:
   - id: back
