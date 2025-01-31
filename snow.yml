@@ -14,7 +14,7 @@ components:
   - id: back
     image: back
     envs: [back]
-    size_hint: ram >= 512m
+    size_hint: ram >= 1g
   - id: migrate
     image: back
     envs: [back]
