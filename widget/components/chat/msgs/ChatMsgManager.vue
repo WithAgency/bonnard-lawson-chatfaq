@@ -1,17 +1,18 @@
 <template>
     <div class="message-wrapper"
          :class="{
-            [props.message.sender.type]: true,
+            [getMessageType()]: true,
             'is-first': props.isFirst,
             'is-last': props.isLast,
             'maximized': store.maximized,
             'mobile-no-margins': iframedMsg && iframedMsg.mobileNoMargins,
             'desktop-no-margins': iframedMsg && iframedMsg.desktopNoMargins,
+            'hidden': shouldHideMessage()
         }">
         <div
             class="message"
             :class="{
-                [props.message.sender.type]: true,
+                [getMessageType()]: true,
                 'is-first': props.isFirst,
                 'is-last': props.isLast,
                 'maximized': store.maximized
@@ -23,7 +24,7 @@
                 }">
                 <div class="stack"
                      :class="{
-                        [props.message.sender.type]: true,
+                        [getMessageType()]: true,
                         'dark-mode': store.darkMode,
                         'maximized': store.maximized,
                         'sources-first': store.sourcesFirst,
@@ -52,11 +53,30 @@
                     </template>
                     <template v-else-if="getFirstLayerType() === 'message' || getFirstLayerType() === 'message_chunk'">
                         <div class="layer" v-for="layer in props.message.stack">
-                            <TextMsgPiece :data="layer" :is-last="isLastOfType && layersFinished" :is-last-chunk="props.message.last_chunk"/>
+                            <TextMsgPiece :data="layer" :is-last="isLastOfType && layersFinished" :is-last-chunk="stackFinished"/>
                         </div>
                         <ReferencesMsgPiece
-                            v-if="!store.hideSources && props.message.stack && props.message.stack[0].payload?.references?.knowledge_items?.length && isLastOfType && (layersFinished || store.sourcesFirst)"
-                            :references="props.message.stack[0].payload.references"></ReferencesMsgPiece>
+                            v-if="!store.hideSources && props.message.stack && props.message.stack[0].payload?.references?.knowledge_items?.length && (stackFinished || store.sourcesFirst)"
+                            :references="props.message.stack[0].payload.references"
+                        ></ReferencesMsgPiece>
+                    </template>
+                    <template v-else-if="getFirstLayerType() === 'tool_use' && !store.hideToolMessages">
+                        <div class="layer" v-for="layer in props.message.stack">
+                            <TextMsgPiece 
+                                :data="formatToolUseLayer(layer)" 
+                                :is-last="isLastOfType && layersFinished" 
+                                :is-last-chunk="stackFinished"
+                            />
+                        </div>
+                    </template>
+                    <template v-else-if="getFirstLayerType() === 'tool_result' && !store.hideToolMessages">
+                        <div class="layer" v-for="layer in props.message.stack">
+                            <TextMsgPiece 
+                                :data="formatToolResultLayer(layer)" 
+                                :is-last="isLastOfType && layersFinished" 
+                                :is-last-chunk="stackFinished"
+                            />
+                        </div>
                     </template>
                     <template v-else-if="getFirstLayerType() === 'file_upload'">
                         <div class="layer" v-for="layer in props.message.stack">
@@ -135,6 +155,7 @@ const feedbacking = ref(null);
 const iframeHeight = ref(40);
 
 const layersFinished = computed(() => props.message.last);
+const stackFinished = computed(() => props.message.last_chunk);
 const iframedWindow = ref(null);
 const iframedMsg = computed(() => store.customIFramedMsg(getFirstLayerType()));
 
@@ -158,6 +179,12 @@ function addingQueryParamStack(url) {
     return urlObj.toString();
 }
 
+function shouldHideMessage() {
+    if (!store.hideToolMessages) return false;
+    const messageType = getFirstLayerType();
+    return messageType === 'tool_use' || messageType === 'tool_result';
+}
+
 onMounted(() => {
     window.addEventListener('message', handleMessage);
 });
@@ -178,6 +205,30 @@ watch(() => store.maximized, () => {
     }
 });
 
+function formatToolUseLayer(layer) {
+    return {
+        ...layer,
+        payload: {
+            content: `Tool ${layer.payload.name} called with args ${JSON.stringify(layer.payload.args)}`
+        }
+    };
+}
+
+function formatToolResultLayer(layer) {
+    return {
+        ...layer,
+        payload: {
+            content: `Tool result for ${layer.payload.name}: ${JSON.stringify(layer.payload.result, null, 2)}`
+        }
+    };
+}
+
+function getMessageType() {
+    if (getFirstLayerType() === 'tool_result') {
+        return 'bot';
+    }
+    return props.message.sender.type;
+}
 
 </script>
 <style scoped lang="scss">
@@ -206,6 +257,10 @@ $phone-breakpoint: 600px;
                 // margin-left: 35vw;
             }
         }
+    }
+
+    &.hidden {
+        display: none;
     }
 
     .content {
